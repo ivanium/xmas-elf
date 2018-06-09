@@ -53,13 +53,14 @@ pub struct DynEntry64(Entry64_);
 unsafe impl Pod for DynEntry32 {}
 unsafe impl Pod for DynEntry64 {}
 
-pub trait Entry {
+pub trait Entry<T> {
     fn name(&self) -> u32;
     fn info(&self) -> u8;
     fn other(&self) -> Visibility_;
     fn shndx(&self) -> u16;
-    fn value(&self) -> u64;
-    fn size(&self) -> u64;
+    fn value(&self) -> T;
+    fn set_value(&mut self, val: T) -> T;
+    fn size(&self) -> T;
 
     fn get_name<'a>(&'a self, elf_file: &ElfFile<'a>) -> Result<&'a str, &'static str>;
 
@@ -107,7 +108,21 @@ pub trait Entry {
     }
 }
 
-impl fmt::Display for Entry {
+impl fmt::Display for Entry<u32> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(writeln!(f, "Symbol table entry:"));
+        try!(writeln!(f, "    name:             {:?}", self.name()));
+        try!(writeln!(f, "    binding:          {:?}", self.get_binding()));
+        try!(writeln!(f, "    type:             {:?}", self.get_type()));
+        try!(writeln!(f, "    other:            {:?}", self.get_other()));
+        try!(writeln!(f, "    shndx:            {:?}", self.shndx()));
+        try!(writeln!(f, "    value:            {:?}", self.value()));
+        try!(writeln!(f, "    size:             {:?}", self.size()));
+        Ok(())
+    }
+}
+
+impl fmt::Display for Entry<u64> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(writeln!(f, "Symbol table entry:"));
         try!(writeln!(f, "    name:             {:?}", self.name()));
@@ -122,8 +137,8 @@ impl fmt::Display for Entry {
 }
 
 macro_rules! impl_entry {
-    ($name: ident with ElfFile::$strfunc: ident) => {
-        impl Entry for $name {
+    ($name: ident with ElfFile::$strfunc: ident, $typ: ident) => {
+        impl Entry<$typ> for $name {
             fn get_name<'a>(&'a self, elf_file: &ElfFile<'a>) -> Result<&'a str, &'static str> {
                 elf_file.$strfunc(self.name())
             }
@@ -132,15 +147,16 @@ macro_rules! impl_entry {
             fn info(&self) -> u8 { self.0.info }
             fn other(&self) -> Visibility_ { self.0.other }
             fn shndx(&self) -> u16 { self.0.shndx }
-            fn value(&self) -> u64 { self.0.value as u64 }
-            fn size(&self) -> u64 { self.0.size as u64 }
+            fn value(&self) -> $typ { self.0.value as $typ }
+            fn set_value(&mut self, val: $typ) -> $typ { self.0.value = val as $typ; self.0.value as $typ }
+            fn size(&self) -> $typ { self.0.size as $typ }
         }
     }
 }
-impl_entry!(Entry32 with ElfFile::get_string);
-impl_entry!(Entry64 with ElfFile::get_string);
-impl_entry!(DynEntry32 with ElfFile::get_dyn_string);
-impl_entry!(DynEntry64 with ElfFile::get_dyn_string);
+impl_entry!(Entry32 with ElfFile::get_string, u32);
+impl_entry!(Entry64 with ElfFile::get_string, u64);
+impl_entry!(DynEntry32 with ElfFile::get_dyn_string, u32);
+impl_entry!(DynEntry64 with ElfFile::get_dyn_string, u64);
 
 #[derive(Copy, Clone, Debug)]
 pub struct Visibility_(u8);
