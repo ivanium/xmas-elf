@@ -252,7 +252,7 @@ pub struct SectionHeader_<P> {
     name: u32,
     type_: ShType_,
     flags: P,
-    address: P,
+    pub address: P,
     offset: P,
     size: P,
     link: u32,
